@@ -233,12 +233,13 @@ Route::group(['namespace' => 'Api\V1', 'middleware'=>'localization'], function (
     Route::get('category_seo/{seo}', 'ProductController@get_seo_category')->where('seo', '.*');
     Route::post('seo_type_check', 'ManufacturerController@seo_type_test')->where('seo', '.*');
     Route::get('hot-deals', 'HotDealsController@getHotDeals');
-    
 
-    Route::get('/payment-mobile', 'PaymentController@payment')->name('payment-mobile');
+    // routes/api.php
+
+    Route::post('inquiry', 'InquiryController@store')->name('inquiry');
 
     Route::post('pay', 'PaypalPaymentController@payWithPaypal');
-    Route::get('paypal-status', 'PaypalPaymentController@getPaymentStatus')->name('paypal-status');
+    Route::get('paypal-status', 'PaypalPaymentController@getPaymentStatus')->name('api.V1.paypal-status');
 
     Route::get('paywithrazorpay', 'RazorPayController@payWithRazorpay')->name('paywithrazorpay');
     Route::post('payment-razor', 'RazorPayController@payment')->name('payment-razor');
@@ -246,6 +247,9 @@ Route::group(['namespace' => 'Api\V1', 'middleware'=>'localization'], function (
     // Route::get('pay-stripe', 'StripePaymentController@payment_process_3d')->name('pay-stripe');
     Route::get('pay-stripe/success', 'StripePaymentController@success')->name('pay-stripe.success');
     // Route::get('pay-stripe/fail', 'StripePaymentController@success')->name('pay-stripe.fail');
+
+    Route::get('payment-success', 'PaymentController@success')->name('api.V1.payment-success');
+    Route::get('payment-fail', 'PaymentController@fail')->name('api.V1.payment-fail');
 
     Route::post('create-checkout-session', 'StripePaymentController@createCheckoutSession');
 });

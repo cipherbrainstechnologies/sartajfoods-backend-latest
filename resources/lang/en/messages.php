@@ -2227,5 +2227,4 @@
   'Sub Category' => 'Sub Category',
   'Sub Categories' => 'Sub Categories',
   'Add new sub sub category' => 'Add new sub sub category',
-  'Your currency is not supported by PAYPAL.' => 'Your currency is not supported by PAYPAL.',
 );

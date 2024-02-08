@@ -131,7 +131,8 @@ class PaypalPaymentController extends Controller
     public function payWithpaypal(Request $request)
     {
         $order_amount = $request['order_amount'];
-        $customer = User::find($request['customer_id']);
+        $userId = (auth()->user()->id) ? auth()->user()->id : $request['customer_id'];
+        $customer = User::find($userId);
         $callback = $request['callback'];
 
         $tr_ref = Str::random(6) . '-' . rand(1, 1000);
@@ -146,7 +147,6 @@ class PaypalPaymentController extends Controller
             ->setQuantity(1)
             ->setPrice($order_amount);
         array_push($items_array, $item);
-
         $item_list = new ItemList();
         $item_list->setItems($items_array);
 
@@ -159,10 +159,9 @@ class PaypalPaymentController extends Controller
         $transaction->setAmount($amount)
             ->setItemList($item_list)
             ->setDescription($tr_ref);
-
         $redirect_urls = new RedirectUrls();
-        $redirect_urls->setReturnUrl(URL::route('paypal-status', ['callback' => $callback, 'transaction_reference' => $tr_ref]))
-            ->setCancelUrl(URL::route('payment-fail', ['callback' => $callback, 'transaction_reference' => $tr_ref]));
+        $redirect_urls->setReturnUrl(URL::route('api.V1.paypal-status', ['callback' => $callback, 'transaction_reference' => $tr_ref]))
+            ->setCancelUrl(URL::route('api.V1.payment-fail', ['callback' => $callback, 'transaction_reference' => $tr_ref]));
 
         $payment = new Payment();
         $payment->setIntent('Sale')
@@ -181,7 +180,8 @@ class PaypalPaymentController extends Controller
 
             Session::put('paypal_payment_id', $payment->getId());
             if (isset($redirect_url)) {
-                return Redirect::away($redirect_url);
+                // return Redirect::away($redirect_url);
+                return $redirect_url;
             }
 
         } catch (\Exception $ex) {
@@ -195,11 +195,23 @@ class PaypalPaymentController extends Controller
 
     public function getPaymentStatus(Request $request)
     {
-        $callback = $request['callback'];
+
+        // Get all query string parameters
+        $queryParams = $request->query();
+
+        // Alternatively, you can get individual parameters
+        $callback = $request->query('callback');
+        $transactionReference = $request->query('transaction_reference');
+        $payment_id = $request->query('paymentId');
+        $token = $request->query('token');
+        $payerId = $request->query('PayerID');
+
+        // $callback = $request['callback'];
         $transaction_reference = $request['transaction_reference'];
 
-        $payment_id = Session::get('paypal_payment_id');
-        if (empty($request['PayerID']) || empty($request['token'])) {
+        // $payment_id = Session::get('paypal_payment_id');
+        // if (empty($request['PayerID']) || empty($request['token'])) {
+        if(empty($payerId) || empty($token)){
             Session::put('error', 'Payment failed');
             return Redirect::back();
         }
@@ -220,7 +232,7 @@ class PaypalPaymentController extends Controller
             if ($callback != null) {
                 return redirect($callback . '/success' . '?token=' . base64_encode($token_string));
             } else {
-                return \redirect()->route('payment-success', ['token' => base64_encode($token_string)]);
+                return \redirect()->route('api.V1.payment-success', ['token' => base64_encode($token_string)]);
             }
         }
         
@@ -228,7 +240,7 @@ class PaypalPaymentController extends Controller
         if ($callback != null) {
             return redirect($callback . '/fail' . '?token=' . base64_encode($token_string));
         } else {
-            return \redirect()->route('payment-fail', ['token' => base64_encode($token_string)]);
+            return \redirect()->route('api.V1.payment-fail', ['token' => base64_encode($token_string)]);
         }
     }
 }
