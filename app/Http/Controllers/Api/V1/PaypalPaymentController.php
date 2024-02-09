@@ -64,71 +64,7 @@ class PaypalPaymentController extends Controller
         $this->_api_context->setConfig($paypal_conf['settings']);
     }
 
-    // public function payWithpaypal(Request $request)
-    // {
-    //     $order_amount = $request['order_amount'];
-    //     $customer = User::find($request['customer_id']);
-    //     $callback = $request['callback'];
-
-    //     $tr_ref = Str::random(6) . '-' . rand(1, 1000);
-    //     $payer = new Payer();
-    //     $payer->setPaymentMethod('paypal');
-
-    //     $items_array = [];
-    //     $item = new Item();
-    //     $item->setName($customer['f_name'])
-    //         ->setCurrency(Helpers::currency_code())
-    //         ->setQuantity(1)
-    //         ->setPrice(5000);
-    //     array_push($items_array, $item);
-    //     $item_list = new ItemList();
-    //     $item_list->setItems($items_array);
-
-    //     $amount = new Amount();
-    //     $amount->setCurrency(Helpers::currency_code())
-    //         ->setTotal($order_amount);
-
-    //     \session()->put('transaction_reference', $tr_ref);
-    //     $transaction = new Transaction();
-    //     $transaction->setAmount($amount)
-    //         ->setItemList($item_list)
-    //         ->setDescription($tr_ref);
-
-    //     $redirect_urls = new RedirectUrls();
-    //     $redirect_urls->setReturnUrl(URL::route('paypal-status', ['callback' => $callback, 'transaction_reference' => $tr_ref]))
-    //         ->setCancelUrl(URL::route('payment-fail', ['callback' => $callback, 'transaction_reference' => $tr_ref]));
-
-    //     $payment = new Payment();
-    //     $payment->setIntent('Sale')
-    //         ->setPayer($payer)
-    //         ->setRedirectUrls($redirect_urls)
-    //         ->setTransactions(array($transaction));
-    //     try {
-    //         $payment->create($this->_api_context);
-
-    //         foreach ($payment->getLinks() as $link) {
-    //             if ($link->getRel() == 'approval_url') {
-    //                 $redirect_url = $link->getHref();
-    //                 break;
-    //             }
-    //         }
-
-    //         Session::put('paypal_payment_id', $payment->getId());
-    //         if (isset($redirect_url)) {
-    //             return Redirect::away($redirect_url);
-    //         }
-
-    //     } catch (\Exception $ex) {
-    //         Toastr::error(translate('Your currency is not supported by PAYPAL.'));
-    //         return back()->withErrors(['error' => 'Failed']);
-    //     }
-
-    //     Session::put('error', 'Configure your paypal account.');
-    //     return back()->withErrors(['error' => 'Failed']);
-    // }
-
-
-    public function payWithpaypal(Request $request)
+    public function payWithpaypal(Request $request,$orderId)
     {
         $order_amount = $request['order_amount'];
         $userId = (auth()->user()->id) ? auth()->user()->id : $request['customer_id'];
@@ -136,6 +72,8 @@ class PaypalPaymentController extends Controller
         $callback = $request['callback'];
 
         $tr_ref = Str::random(6) . '-' . rand(1, 1000);
+
+        Session::put('order_id', $orderId);
 
         $payer = new Payer();
         $payer->setPaymentMethod('paypal');
@@ -160,8 +98,8 @@ class PaypalPaymentController extends Controller
             ->setItemList($item_list)
             ->setDescription($tr_ref);
         $redirect_urls = new RedirectUrls();
-        $redirect_urls->setReturnUrl(URL::route('api.V1.paypal-status', ['callback' => $callback, 'transaction_reference' => $tr_ref]))
-            ->setCancelUrl(URL::route('api.V1.payment-fail', ['callback' => $callback, 'transaction_reference' => $tr_ref]));
+        $redirect_urls->setReturnUrl(URL::route('api.V1.paypal-status', ['callback' => $callback, 'transaction_reference' => $tr_ref,'order_id' => $orderId]))
+            ->setCancelUrl(URL::route('api.V1.payment-fail', ['callback' => $callback, 'transaction_reference' => $tr_ref,'order_id' => $orderId]));
 
         $payment = new Payment();
         $payment->setIntent('Sale')
@@ -195,7 +133,6 @@ class PaypalPaymentController extends Controller
 
     public function getPaymentStatus(Request $request)
     {
-
         // Get all query string parameters
         $queryParams = $request->query();
 
@@ -205,9 +142,10 @@ class PaypalPaymentController extends Controller
         $payment_id = $request->query('paymentId');
         $token = $request->query('token');
         $payerId = $request->query('PayerID');
+        $orderId = $request->query('order_id');
 
         // $callback = $request['callback'];
-        $transaction_reference = $request['transaction_reference'];
+        // $transaction_reference = $request['transaction_reference'];
 
         // $payment_id = Session::get('paypal_payment_id');
         // if (empty($request['PayerID']) || empty($request['token'])) {
@@ -227,7 +165,15 @@ class PaypalPaymentController extends Controller
         $transaction_reference = $payment_id;
         $token_string = 'payment_method=paypal&&transaction_reference=' . $transaction_reference;
 
+        $order = Order::find($orderId);
+
         if ($result->getState() == 'approved') {
+            $transactionReference = Session::get('transaction_reference');
+            $order->payment_status = "paid";
+            $order->transaction_reference = $transaction_reference;
+
+            $order->save();
+
             //success
             if ($callback != null) {
                 return redirect($callback . '/success' . '?token=' . base64_encode($token_string));
@@ -238,6 +184,9 @@ class PaypalPaymentController extends Controller
         
         //fail
         if ($callback != null) {
+            $order->transaction_reference = $transaction_reference;
+            $order->payment_status = "fail";
+            $order->save();
             return redirect($callback . '/fail' . '?token=' . base64_encode($token_string));
         } else {
             return \redirect()->route('api.V1.payment-fail', ['token' => base64_encode($token_string)]);

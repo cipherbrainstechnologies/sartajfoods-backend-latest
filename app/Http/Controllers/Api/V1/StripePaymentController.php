@@ -59,7 +59,6 @@ class StripePaymentController extends Controller
                     'success_url' => route('pay-stripe.success', ['callback' => $callback, 'transaction_reference' => $tran]),
                     'cancel_url' => url()->previous(),
                 ]);
-
                 // Return the payment link
                 return response()->json(['payment_link' => $checkout_session->url]);
             }else{
